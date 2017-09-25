@@ -39,6 +39,10 @@ pcre_dir = join(engine_dir,'pcre')
 ssh2_dir = join(engine_dir,'ssh2')
 crypto_dir = join(thirdparty_dir, 'crypto')
 ssl_dir = join(crypto_dir, 'openssl-1.0.1c')
+#lz4_dir = join(thirdparty_dir, 'lz4')
+#lz4_lib_dir = join(lz4_dir, 'lib')
+#zlib_dir = join(thirdparty_dir, 'zlib')
+#zlib_lib_dir = join(zlib_dir, 'lib')
 gtest_dir = join(engine_dir,'gtest')
 ncursesinclude_dir = join(engine_dir, 'ncurses/include')
 driver_dir = join(db_dir,'driver')
@@ -49,9 +53,9 @@ options = {}
 
 options_topass = {}
 
-def mergeStaticLibrary(target, *sources):
-    if not sys.platform.startswith('linux'):
-        raise Exception('mergeStaticLibrary currently only support linux')
+def mergeStaticLibrary(target, aix, *sources):
+    if not sys.platform.startswith('linux') and not sys.platform.startswith('aix'):
+        raise Exception('mergeStaticLibrary currently only support linux or aix')
     if not os.path.isabs(target):
         raise Exception('target must be a absolute path: ' + target)
     path = os.path.dirname(target)
@@ -68,19 +72,29 @@ def mergeStaticLibrary(target, *sources):
     os.mkdir(subdir)
     #print("current directory is " + os.getcwd())
     print("create objs directory: " + subdir )
+    cmd = ""
     for s in sources:
         if not os.path.isabs(s):
             raise Exception('source must be a absolute path: ' + s)
         if not os.path.exists(s):
             raise Exception('source not exists: ' + s)
         print("extract objs from " + s)
-        cmd = "ar x " + s
+        if aix:
+            cmd = "ar -X32_64 x " + s
+        else:
+            cmd = "ar x " + s
         print(cmd)
         subprocess.check_call(cmd, shell=True)
-        cmd = "mv `ar t " + s + "` " + subdir
+        if aix:
+            cmd = "mv `ar -X32_64 t " + s + "` " + subdir
+        else:
+            cmd = "mv `ar t " + s + "` " + subdir
         print(cmd)
         subprocess.check_call(cmd, shell=True)
-    cmd = "ar cr " + target + " " + subdir + "/*.o"
+    if aix:
+        cmd = "ar -X32_64 cr " + target + " " + subdir + "/*.o"
+    else:
+        cmd = "ar cr " + target + " " + subdir + "/*.o"
     print(cmd)
     subprocess.check_call(cmd, shell=True)
     cmd = "ranlib " + target
@@ -95,6 +109,8 @@ def GuessOS():
       return 'linux'
    elif id == 'Windows' or id == 'Microsoft':
       return 'win32'
+   elif id == 'AIX':
+      return 'aix'
    else:
       return None
 
@@ -219,6 +235,12 @@ add_option( "fap", "foreign access protocol", 0, False )
 #enterprise options
 add_option( "enterprise", "build enterprise sequoiadb ( with SSL )", 0, False )
 
+#gprof option
+add_option("gprof", "enable gprofile for sequoiadb", 0, False)
+
+#aix xlc
+add_option("xlc", "use xlc in AIX", 0, False)
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -246,6 +268,11 @@ nix = False
 linux = False
 linux64  = False
 windows = False
+aix = False
+xlc = False
+
+if guess_os == "aix":
+    xlc = has_option("xlc")
 
 release = True
 debugBuild = False
@@ -300,6 +327,7 @@ hasFmp = has_option("fmp")
 hasAll = has_option( "all" )
 hasFap = has_option("fap")
 hasEnterprise = has_option("enterprise")
+hasGProf = has_option("gprof")
 hasSSL = False
 
 # build enterprise edition
@@ -321,11 +349,17 @@ elif not ( hasEngine or hasClient or hasTestcase or hasTool or hasShell or hasFm
    hasEngine = True
    hasClient = True
    hasShell = True
+   hasTool = True
+   hasFmp = True
+elif ( hasTestcase and not hasEngine ):
+   hasEngine = True
 
 boostCompiler = ""
 boostVersion = ""
 
-usesm = True
+usesm = False
+if guess_os == 'linux' or guess_os == 'win32':
+   usesm = True
 
 extraLibPlaces = []
 
@@ -407,6 +441,7 @@ elif guess_os == "win32":
         hdfsJniMdPath = join(java_dir,"jdk_win64/include/win32")
 
 env.Append(
+#CPPPATH=[join(engine_dir,'include'),join(engine_dir,'client'),join(ssl_dir,'include'),join(lz4_dir,'include'),join(zlib_dir,'include'),join(gtest_dir,'include'),pcre_dir, boost_dir, ssh2_dir, hdfsJniPath, hdfsJniMdPath] )
 CPPPATH=[join(engine_dir,'include'),join(engine_dir,'client'),join(ssl_dir,'include'),join(gtest_dir,'include'),pcre_dir, boost_dir, ssh2_dir, hdfsJniPath, hdfsJniMdPath] )
 
 env.Append( CPPDEFINES=["__STDC_LIMIT_MACROS", "HAVE_CONFIG_H"] )
@@ -434,6 +469,8 @@ if guess_os == "linux":
         env.Append( EXTRALIBPATH=boost_lib_dir )
         # use project-related ssl library
         env.Append( EXTRALIBPATH=join(ssl_dir,'lib/linux64') )
+        #env.Append( EXTRALIBPATH=join(zlib_lib_dir,'linux64') )
+        #env.Append( EXTRALIBPATH=join(lz4_lib_dir,'linux64') )
         # use project-related spidermonkey library
         if usesm:
             if debugBuild:
@@ -445,6 +482,8 @@ if guess_os == "linux":
                 env.Append( CPPPATH=join(js_dir,'lib/release/linux64/include') )
                 env.Append( EXTRALIBPATH=[smlib_dir] )
         ssllib_dir = join(ssl_dir,'lib/linux64')
+        #zlib_lib_dir_platform = join(zlib_lib_dir, 'linux64')
+        #lz4_lib_dir_platform = join(lz4_lib_dir, 'linux64')
     # in case for 32 bit linux or compiling 32 bit in 64 env
     elif guess_arch == "ia32":
         linux64 = False
@@ -455,6 +494,8 @@ if guess_os == "linux":
         env.Append( EXTRALIBPATH=boost_lib_dir )
         # use project-related ssl library
         env.Append( EXTRALIBPATH=join(ssl_dir,'lib/linux32') )
+        #env.Append( EXTRALIBPATH=join(zlib_lib_dir,'linux32') )
+        #env.Append( EXTRALIBPATH=join(lz4_lib_dir,'linux32') )
         # and 32 bit spidermonkey library
         if usesm:
             if debugBuild:
@@ -467,6 +508,8 @@ if guess_os == "linux":
                 env.Append( EXTRALIBPATH=[smlib_dir] )
                 # if we are in 64 bit box but want to build 32 bit release
         ssllib_dir = join(ssl_dir,'lib/linux32')
+        #zlib_lib_dir_platform = join(zlib_lib_dir, 'linux32') 
+        #lz4_lib_dir_platform = join(lz4_lib_dir, 'linux32')
     # power pc linux
     elif guess_arch == "ppc64":
         linux64 = True
@@ -480,6 +523,8 @@ if guess_os == "linux":
         env.Append( EXTRALIBPATH=boost_lib_dir )
         # use project-related ssl library
         env.Append( EXTRALIBPATH=join(ssl_dir,'lib/ppclinux64') )
+        #env.Append( EXTRALIBPATH=join(zlib_lib_dir,'ppclinux64') )
+        #env.Append( EXTRALIBPATH=join(lz4_lib_dir,'ppclinux64') )
         # use project-related spidermonkey library
         if usesm:
             if debugBuild:
@@ -491,7 +536,8 @@ if guess_os == "linux":
                 env.Append( CPPPATH=join(js_dir,'lib/release/ppclinux64/include') )
                 env.Append( EXTRALIBPATH=[smlib_dir] )
         ssllib_dir = join(ssl_dir,'lib/ppclinux64')
-
+        #zlib_lib_dir_platform = join(zlib_lib_dir, 'ppclinux32') 
+        #lz4_lib_dir_platform = join(lz4_lib_dir, 'ppclinux32')
     # spider monkey
     if usesm:
         smlib_file = join(smlib_dir, 'libmozjs185.so')
@@ -502,6 +548,13 @@ if guess_os == "linux":
     env.Append( LIBS=['crypto'] )
     ssllib_file = join(ssllib_dir, 'libcrypto.a')
     ssllib_file1 = join(ssllib_dir, 'libssl.a')
+
+	# lz4 and zlib
+    #env.Append( LIBS=['lz4'] )
+    #env.Append( LIBS=['z'] )
+    #zlib_lib = join(zlib_lib_dir_platform, 'libz.a')
+    #lz4_lib = join(lz4_lib_dir_platform, 'liblz4.a')
+
     nix = True
 
 elif "win32" == guess_os:
@@ -523,6 +576,8 @@ elif "win32" == guess_os:
         env.Append( EXTRALIBPATH=boost_lib_dir )
         # use project-related ssl library
         env.Append( EXTRALIBPATH=join(ssl_dir,'lib/win64') )
+        #env.Append( EXTRALIBPATH=join(zlib_lib_dir,'win64') )
+        #env.Append( EXTRALIBPATH=join(lz4_lib_dir,'win64') )
         # use 64 bit spidermonkey
         if usesm:
             if debugBuild:
@@ -534,12 +589,16 @@ elif "win32" == guess_os:
                 env.Append( CPPPATH=join(js_dir,'lib/release/win64/include') )
                 env.Append( EXTRALIBPATH=[smlib_dir] )
         ssllib_dir = join(ssl_dir,'lib/win64')
+        #zlib_lib_dir_platform = join(zlib_lib_dir, 'win64') 
+        #lz4_lib_dir_platform = join(lz4_lib_dir, 'win64')
     else:
         boost_lib_dir = join(boost_lib_dir,'win32')
         # we are 32 bit
         env.Append( EXTRALIBPATH=boost_lib_dir )
         # use project-related ssl library
         env.Append( EXTRALIBPATH=join(ssl_dir,'lib/win32') )
+        #env.Append( EXTRALIBPATH=join(zlib_lib_dir,'win32') )
+        #env.Append( EXTRALIBPATH=join(lz4_lib_dir,'win32') )
         if usesm:
             if debugBuild:
                 smlib_dir = join(js_dir,'lib/debug/win32/lib')
@@ -550,6 +609,8 @@ elif "win32" == guess_os:
                 env.Append( CPPPATH=join(js_dir,'lib/release/win32/include') )
                 env.Append( EXTRALIBPATH=[smlib_dir] )
         ssllib_dir = join(ssl_dir,'lib/win32')
+        #zlib_lib_dir_platform = join(zlib_lib_dir, 'win32') 
+        #lz4_lib_dir_platform = join(lz4_lib_dir, 'win32')
     if usesm:
         smlib_file = join(smlib_dir, 'mozjs185-1.0.dll')
         env.Append( CPPDEFINES=[ "XP_WIN" ] )
@@ -560,6 +621,7 @@ elif "win32" == guess_os:
     env.Append( LIBS=['libeay32'] )
     ssllib_file = join(ssllib_dir, 'libeay32.lib')
     ssllib_file1 = join(ssllib_dir, 'ssleay32.lib')
+
     # UNICODE
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
@@ -607,28 +669,89 @@ elif "win32" == guess_os:
     winLibString += " odbc32.lib odbccp32.lib uuid.lib dbghelp.lib "
 
     env.Append( LIBS=Split(winLibString) )
+elif guess_os == 'aix':
+   aix = True
+   nix = True
+
+   if xlc:
+      env.Replace( CC=" xlC_r -qtls " )
+      env.Replace( CXX=" xlC_r -qtls " )
+   # -lm
+   env.Append( LIBS=['m'] )
+   # -ldl
+   env.Append( LIBS=['dl'] )
+   # -lpthread
+   env.Append( LIBS=["pthread"] )
+   # GNU
+   env.Append( CPPDEFINES=[ "_GNU_SOURCE" ] )
+   # AIX64
+   if xlc:
+      env.Append( CPPFLAGS=" -q64 " )
+      env.Append( LINKFLAGS=" -q64 " )
+      env.Replace( SHLINKFLAGS=" -q64 -qmkshrobj " )
+   else: # gcc
+      env.Append( CPPFLAGS=" -maix64 -static-libgcc -static-libstdc++ " )
+      env.Append( LINKFLAGS=" -maix64 -static-libgcc -static-libstdc++ " )
+   env.Append( AR=" -X64 " )
+   nixLibPrefix = "lib"
+   boost_lib_dir = join(boost_lib_dir,'aix64')
+   # use big endian
+   env.Append( CPPDEFINES=[ "SDB_BIG_ENDIAN" ] )
+   env.Append( EXTRALIBPATH="/lib" )
+   # use project-related boost library
+   env.Append( EXTRALIBPATH=boost_lib_dir )
+   # use project-related ssl library
+   env.Append( EXTRALIBPATH=join(ssl_dir,'lib/aix64') )
+   # use project-related spidermonkey library
+   if usesm:
+      if debugBuild:
+          smlib_dir = join(js_dir,'lib/debug/aix64/lib')
+          env.Append( CPPPATH=join(js_dir,'lib/debug/aix64/include') )
+          env.Append( EXTRALIBPATH=[smlib_dir] )
+      else:
+          smlib_dir = join(js_dir,'lib/release/aix64/lib')
+          env.Append( CPPPATH=join(js_dir,'lib/release/aix64/include') )
+          env.Append( EXTRALIBPATH=[smlib_dir] )
+
+   # spider monkey
+   if usesm:
+      smlib_file = join(smlib_dir, 'libmozjs185.so')
+      env.Append( CPPDEFINES=[ "XP_UNIX" ] )
+      env.Append( LIBS=['js_static'] )
+   # SSL
+   ssllib_dir = join(ssl_dir,'lib/aix64')
+   #env.Append( LIBS=['ssl'] )
+   #env.Append( LIBS=['crypto'] )
+   ssllib_file = join(ssllib_dir, 'libcrypto.a')
+   ssllib_file1 = join(ssllib_dir, 'libssl.a')
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 
 env['STATIC_AND_SHARED_OBJECTS_ARE_THE_SAME'] = 1
 if nix:
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wno-write-strings -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch -Wno-address" )
+    if xlc:
+        env.Append( CPPFLAGS=" -qpic=large -qalias=noansi -g " )
+    else:
+        env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wno-write-strings -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch -Wno-address" )
+        env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
+        if aix:
+            env.Append( LINKFLAGS=" -fPIC -pthread " )
+        else:
+            env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     if linux:
         env.Append( CPPFLAGS=" -pipe " )
         env.Append( CPPFLAGS=" -fno-builtin-memcmp " )
-
     env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
-    env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
-    env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
-
     env['ENV']['HOME'] = os.environ['HOME']
     env['ENV']['TERM'] = os.environ['TERM']
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector " );
-        env['ENV']['GLIBCXX_FORCE_NEW'] = 1;
-        env.Append( CPPFLAGS=" -D_DEBUG" );
+        env.Append( CPPFLAGS=" -O0 " )
+        if not aix:
+            env.Append( CPPFLAGS=" -fstack-protector " )
+        env['ENV']['GLIBCXX_FORCE_NEW'] = 1
+        env.Append( CPPFLAGS=" -D_DEBUG" )
     else:
         env.Append( CPPFLAGS=" -O3 " )
 
@@ -701,6 +824,11 @@ if hasSSL:
     env.Append( CPPDEFINES=[ "SDB_SSL" ] )
     fapEnv.Append( CPPDEFINES=[ "SDB_SSL" ] )
 
+if linux:
+    if hasGProf:
+        env.Append( CPPFLAGS=" -pg " )
+        env.Append( LINKFLAGS=" -pg " )
+
 env['INSTALL_DIR'] = installDir
 if testEnv is not None:
     testEnv['INSTALL_DIR'] = installDir
@@ -732,7 +860,7 @@ Export("clientCppEnv")
 Export("clientCEnv")
 Export("installSetup getSysInfo")
 Export("usesm")
-Export("windows linux nix")
+Export("windows linux nix aix")
 if usesm:
    Export("smlib_file")
 Export("ssllib_file")
@@ -779,7 +907,8 @@ import jsToCpp
 jsToCpp.jsToCpp(engine_dir)
 
 if hasClient:
-   clientCppEnv.SConscript( 'SequoiaDB/SConscriptClientCpp', variant_dir=clientCppVariantDir, duplicate=False )
+   if not xlc: # xlc doesn't support #pragma once, so there are compiling errors
+       clientCppEnv.SConscript( 'SequoiaDB/SConscriptClientCpp', variant_dir=clientCppVariantDir, duplicate=False )
    clientCEnv.SConscript ( 'SequoiaDB/SConscriptClientC', variant_dir=clientCVariantDir, duplicate=False )
 
 if hasShell:

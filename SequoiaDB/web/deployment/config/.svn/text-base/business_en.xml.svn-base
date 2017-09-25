@@ -1,0 +1,14 @@
+<BusinessList type="array">
+	<FILLER>
+		<BusinessType>sequoiadb</BusinessType>
+		<BusinessDesc>Database</BusinessDesc> 
+	</FILLER>
+	<FILLER>
+		<BusinessType>spark</BusinessType>
+		<BusinessDesc>spark</BusinessDesc> 
+	</FILLER>
+	<FILLER>
+		<BusinessType>zookeeper</BusinessType>
+		<BusinessDesc>zookeeper</BusinessDesc> 
+	</FILLER>
+</BusinessList>

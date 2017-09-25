@@ -19,7 +19,7 @@
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="sequoiadb databse service"
+DESC="sequoiadb database service"
 NAME=sequoiadb
 
 DAEMON_START=sdbcmart

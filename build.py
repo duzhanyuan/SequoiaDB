@@ -56,7 +56,7 @@ for opt, arg in opts:
       help_info()
       sys.exit(1)
 
-build_cmd_pre = 'scons ' + build_type
+build_cmd_pre = 'scons -j 4 ' + build_type
 
 #build engine/tools/testcases/shell/client/fmp
 build_all_cmd = build_cmd_pre + ' --all'

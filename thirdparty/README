@@ -224,3 +224,26 @@ PowerLinux64:
                 ./Configure linux-ppc64
                 make
                 copy libcrypto.a and libssl.a to crypto/openssl-1.0.1c/lib/ppclinux64/
+
+Aix64:
+        Building Prerequisites:
+                g++ 4.6.3
+                libstdc++ 6
+                Python 2.7.3
+                autoconf 2.13 ( source code in ..\tools\compile\autoconf-2.13 )
+                scons
+
+        NOTE: gcc-aix generates 32-bit objects by default, so it needs add -maix64 for generating 64-bit objects.
+
+        Boost 1.49.0:
+                ./bootstrap.sh --prefix=./
+                ./bjam link=static threading=multi variant=release address-model=64 toolset=gcc runtime-link=static cxxflags="-maix64" linkflags="-maix64"
+                copy boost/stage/lib/* to boost/lib/aix64
+
+        OpenSSL 1.0.1c:
+                NOTE: use GNU ld
+                cd crypto/openssl-1.0.1c/
+                ./Configure aix64-gcc -fPIC threads
+                make
+                make test
+                copy libcrypto.a and libssl.a to crypto/openssl-1.0.1c/lib/aix64/

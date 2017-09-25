@@ -284,17 +284,17 @@ copy_file $src_dir_bin//sdbdpsdump $dest_dir_tls_sdbsppt
 copy_file $src_dir_tls_sdbsppt/sdbsupportfunc1.sh $dest_dir_tls_sdbsppt
 copy_file $src_dir_tls_sdbsppt/sdbsupportfunc2.sh $dest_dir_tls_sdbsppt
 copy_file $src_dir_tls_sdbsppt/sdbsupport.sh $dest_dir_tls_sdbsppt
-src_dir_tls_sdbsppt_expt="$src_dir_tls_sdbsppt/expect"
-dest_dir_tls_sdbsppt_expt="$pkg_src_tmp/tools/sdbsupport/expect"
-mkdir -p $dest_dir_tls_sdbsppt_expt
-copy_file $src_dir_tls_sdbsppt_expt/expect $dest_dir_tls_sdbsppt_expt
-copy_file $src_dir_tls_sdbsppt_expt/install.sh $dest_dir_tls_sdbsppt_expt
-copy_file $src_dir_tls_sdbsppt_expt/libtcl8.4.so $dest_dir_tls_sdbsppt_expt
-copy_file $src_dir_tls_sdbsppt_expt/readme.txt $dest_dir_tls_sdbsppt_expt
-copy_folder "$src_dir_tls_sdbsppt_expt/tcl" "$dest_dir_tls_sdbsppt_expt"
-dest_dir_tls_sdbsppt_lib="$pkg_src_tmp/tools/sdbsupport/lib"
-mkdir -p $dest_dir_tls_sdbsppt_lib
-copy_folder "$sdb_path/tools/sdbsupport/lib/tcl8.4" "$dest_dir_tls_sdbsppt_lib"
+# src_dir_tls_sdbsppt_expt="$src_dir_tls_sdbsppt/expect"
+# dest_dir_tls_sdbsppt_expt="$pkg_src_tmp/tools/sdbsupport/expect"
+# mkdir -p $dest_dir_tls_sdbsppt_expt
+# copy_file $src_dir_tls_sdbsppt_expt/expect $dest_dir_tls_sdbsppt_expt
+# copy_file $src_dir_tls_sdbsppt_expt/install.sh $dest_dir_tls_sdbsppt_expt
+# copy_file $src_dir_tls_sdbsppt_expt/libtcl8.4.so $dest_dir_tls_sdbsppt_expt
+# copy_file $src_dir_tls_sdbsppt_expt/readme.txt $dest_dir_tls_sdbsppt_expt
+# copy_folder "$src_dir_tls_sdbsppt_expt/tcl" "$dest_dir_tls_sdbsppt_expt"
+# dest_dir_tls_sdbsppt_lib="$pkg_src_tmp/tools/sdbsupport/lib"
+# mkdir -p $dest_dir_tls_sdbsppt_lib
+# copy_folder "$sdb_path/tools/sdbsupport/lib/tcl8.4" "$dest_dir_tls_sdbsppt_lib"
 php_name=""
 if [ "os_$arch_info" == "os_x86_64" ];then
    php_name="php_linux"
